@@ -69,6 +69,8 @@ do
 # grep -h "EKIN_LAT" $ff |awk '{print $(NF-1)}'|sed -e 's/(temperature//g' >> $d/temp.dat             # Version 5.4
  
  dt=$(grep -h -m 1 'POTIM' $d/OUTCAR| awk '{print $3}')
+ NBLOCK=$(awk '/NBLOCK/{print $3}' INCAR)
+ dt=`echo $dt $NBLOCK | awk '{print $1*$2}'`
 
  echo "Calculating EKIN                                      ---> $d/Kin.dat"
  grep -h "EKIN " $ff | awk '{print $5}'                                > $d/Kin.dat 
@@ -83,16 +85,31 @@ do
   grep -h "external pressure" $ff | awk -v dt=$dt '{print NR*dt,$4/10}' > $d/press.dat
   grep -h "total pressure" $ff    | awk -v dt=$dt '{print NR*dt,$4/10}' > $d/totpress.dat
  else 
+ #==============  MACHINE LEARNING PRESSURES ===============#
   echo "    Machine Learning calculation                       ---> press.dat, totpress.dat, press_KS.dat, totpress_KS.dat"
   #awk 'FNR==1{fileN++; N+=nstep;} /Ionic step/{nstep=$4} /external pressure/{P=$4}/TOTAL-FORCE/{if (!($0 ~ "ML")) print nstep+N-1,P/10 } ' $ff   > $d/press_KS.dat
   #awk 'FNR==1{fileN++; N+=nstep;} /Ionic step/{nstep=$4} /total pressure/   {P=$4}/TOTAL-FORCE/{if (!($0 ~ "ML")) print nstep+N-1,P/10 } ' $ff   > $d/totpress_KS.dat
   #awk '/external pressure/{P=$4}/TOTAL-FORCE/ && /ML/{print P/10 }' $ff   > $d/press.dat
   #awk '/total pressure/{P=$4}/TOTAL-FORCE/ && /ML/{print P/10 }' $ff   > $d/totpress.dat
-  awk 'FNR==1{fileN++; N+=nstep;} /POTIM = /{dt=$3} /Ionic step/{nstep=$4} /external pressure/{P=$4} /TOTAL-FORCE/ && !/ML/{ print (nstep+N-1)*dt,P/10 } ' $ff   > $d/press_KS.dat
-  awk 'FNR==1{fileN++; N+=nstep;} /POTIM = /{dt=$3} /Ionic step/{nstep=$4} /total pressure/   {P=$4}/TOTAL-FORCE/{if ($0 ~ "ML") P_ML=P; else {P_DFT=P; printf("%.2f  %8.4f  %8.4f\n", (nstep+N-1)*dt,P/10, P_ML/10)} } ' $ff   > $d/totpress_KS.dat
-  awk 'FNR==1{fileN++; N+=nstep;} /POTIM = /{dt=$3} /Ionic step/{nstep=$4} /external pressure/{P=$4} /TOTAL-FORCE/ && /ML/{ print (nstep+N-1)*dt,P/10 } ' $ff   > $d/press.dat
-  awk 'FNR==1{fileN++; N+=nstep;} /POTIM = /{dt=$3} /Ionic step/{nstep=$4} /total pressure/{P=$4} /TOTAL-FORCE/ && /ML/{ print (nstep+N-1)*dt,P/10 } ' $ff   > $d/totpress.dat
+  if [ "$(grep "TOTAL-FORCE" OUTCAR  | grep -v ML)" == "" ]; then echo "" > $d/press_KS.dat;  echo "" > $d/totpress_KS.dat;
+  else
+  ## Old version
+  ##awk 'FNR==1{fileN++; N+=nstep;} /POTIM = /{dt=$3} /Ionic step/{nstep=$4} /external pressure/{P=$4} /TOTAL-FORCE/ && !/ML/{ print (nstep+N-1)*dt,P/10 } ' $ff   > $d/press_KS.dat
+  ##awk 'FNR==1{fileN++; N+=nstep;} /POTIM = /{dt=$3} /Ionic step/{nstep=$4} /total pressure/   {P=$4}/TOTAL-FORCE/{if ($0 ~ "ML") P_ML=P; else {P_DFT=P; printf("%.2f  %8.4f  %8.4f\n", (nstep+N-1)*dt,P/10, P_ML/10)} } ' $ff   > $d/totpress_KS.dat
+
+  # New algorithm 04/03/2024
+  grep  -h 'POTIM\|Ionic step\|external pressure\|TOTAL-FORCE'  $ff  | awk ' /POTIM = /{dt=$3; N+=nstep} /Ionic step/{nstep=$4} /external pressure/{P=$4} /TOTAL-FORCE/ && !/ML/{ print (nstep+N-1)*dt,P/10 } '  > $d/press_KS.dat
+  grep  -h 'POTIM\|Ionic step\|total pressure\|TOTAL-FORCE'     $ff  | awk ' /POTIM = /{dt=$3; N+=nstep} /Ionic step/{nstep=$4} /total pressure/   {P=$4}/TOTAL-FORCE/{if ($0 ~ "ML") P_ML=P; else {P_DFT=P; printf("%.2f  %8.4f  %8.4f\n", (nstep+N-1)*dt,P/10, P_ML/10)} } '  > $d/totpress_KS.dat
+  fi
+  ## Old version
+  ##awk 'FNR==1{fileN++; N+=nstep;} /POTIM = /{dt=$3} /Ionic step/{nstep=$4} /external pressure/{P=$4} /TOTAL-FORCE/ && /ML/{ print (nstep+N-1)*dt,P/10 } ' $ff   > $d/press.dat
+  ##awk 'FNR==1{fileN++; N+=nstep;} /POTIM = /{dt=$3} /Ionic step/{nstep=$4} /total pressure/{P=$4} /TOTAL-FORCE/ && /ML/{ print (nstep+N-1)*dt,P/10 } ' $ff   > $d/totpress.dat
+
+  # New algorithm 04/03/2024
+  grep  -h 'POTIM\|Ionic step\|external pressure\|TOTAL-FORCE'  $ff  | awk ' /POTIM = /{dt=$3; N+=nstep} /Ionic step/{nstep=$4} /external pressure/{P=$4} /TOTAL-FORCE/ && /ML/{ print (nstep+N-1)*dt,P/10 }'  >  $d/press.dat
+  grep  -h 'POTIM\|Ionic step\|total pressure\|TOTAL-FORCE'     $ff  | awk ' /POTIM = /{dt=$3; N+=nstep} /Ionic step/{nstep=$4} /total pressure/{P=$4} /TOTAL-FORCE/ && /ML/{    print (nstep+N-1)*dt,P/10 }'  >  $d/totpress.dat
  fi
+ #==========================================================#
 
  echo "Calculating Volume (to calculate NkT/V)"
 grep -h "volume of cel" $ff | awk '{print $NF}' > $d/vol.dat #| sed -e '$d' > $d/vol.dat
@@ -104,18 +121,31 @@ grep -h "volume of cel" $ff | awk '{print $NF}' > $d/vol.dat #| sed -e '$d' > $d
  if [ "$(grep 'ML_' $d/INCAR)" == "" ]; then
   grep -h "free  energy   TOTEN" $ff | awk -v NN=$NN -v dt=$dt '{printf ("%.2f  %.8f\n", NR*dt, $(NF-1)/NN) }'    > $d/F.dat # TOTEN= F = U_el - TS_el = Pot + EENTRO   (EENTRO = -TS)
   grep -h "ion-electron   TOTEN" $ff | awk -v NN=$NN -v dt=$dt '{printf ("%.2f  %.8f\n", NR*dt, $(NF-2)/NN) }'    > $d/F_ion-electron.dat # Same as "free  energy   TOTEN"
+ #==============  MACHINE LEARNING FREE ENERGIES ===============#
  else
   echo "    Machine Learning calculation                       ---> F.dat, F_ion-electron.dat, F_KS.dat" 
   #grep -h "free  energy   TOTEN" $ff | awk -v N=$NN '{printf ("%.8f\n", $(NF-1)/N) }'    > $d/F_KS.dat # TOTEN= F = U_el - TS_el = Pot + EENTRO   (EENTRO = -TS)
   #awk -v NN=$NN  'FNR==1{fileN++; N+=nstep;} /Ionic step/{nstep=$4} /free  energy   TOTEN/{F=$(NF-1)} /TOTAL-FORCE/{if (!($0 ~ "ML"))   printf ("%s  %.8f\n", nstep+N-1, F/NN) }  '  $ff   > $d/F_KS.dat
 
-  awk -v NN=$NN  'FNR==1{fileN++; N+=nstep;} /POTIM = /{dt=$3} /Ionic step/{nstep=$4} /free  energy   TOTEN/{F=$(NF-1);   printf ("%s  %.8f\n", (nstep+N-1)*dt, F/NN) }  '  $ff   > $d/F_KS.dat
-  awk -v NN=$NN  'FNR==1{fileN++; N+=nstep;} /POTIM = /{dt=$3} /Ionic step/{nstep=$4} /ion-electron   TOTEN/{F=$(NF-2);   printf ("%s  %.8f\n", (nstep+N-1)*dt, F/NN) }  '  $ff   > $d/F_ion-electron.dat
+  if [ "$(grep "TOTAL-FORCE" OUTCAR  | grep -v ML)" == "" ]; then echo "" > $d/F_KS.dat;
+  else
+  ## Old algorithm
+  ##awk -v NN=$NN  'FNR==1{fileN++; N+=nstep;} /POTIM = /{dt=$3} /Ionic step/{nstep=$4} /free  energy   TOTEN/{F=$(NF-1);   printf ("%s  %.8f\n", (nstep+N-1)*dt, F/NN) }  '  $ff   > $d/F_KS.dat
+
+  # New algorithm 04/03/2024
+  grep  -h 'POTIM\|Ionic step\|free  energy   TOTEN'  $ff  | awk  -v NN=$NN ' /POTIM = /{dt=$3; N+=nstep} /Ionic step/{nstep=$4} /free  energy   TOTEN/{F=$(NF-1);   printf ("%s  %.8f\n", (nstep+N-1)*dt, F/NN) }  '   > $d/F_KS.dat
+  fi
   #awk -v NN=$NN  'FNR==1{fileN++; N+=nstep;} /POTIM = /{dt=$3} /Ionic step/{nstep=$4} /free  energy ML TOTEN/{F=$(NF-1);  printf ("%s  %.8f\n", (nstep+N-1)*dt, F/NN ) } '  $ff   > $d/F.dat
+  ## Old algorithm
+  ##awk -v NN=$NN  'FNR==1{fileN++; N+=nstep;} /POTIM = /{dt=$3} /Ionic step/{nstep=$4} /ion-electron   TOTEN/{F=$(NF-2);   printf ("%s  %.8f\n", (nstep+N-1)*dt, F/NN) }  '  $ff   > $d/F_ion-electron.dat
+
+  # New algorithm 04/03/2024
+  grep  -h 'POTIM\|Ionic step\|ion-electron   TOTEN'  $ff  | awk  -v NN=$NN ' /POTIM = /{dt=$3; N+=nstep} /Ionic step/{nstep=$4} /ion-electron   TOTEN/{F=$(NF-2);   printf ("%s  %.8f\n", (nstep+N-1)*dt, F/NN) }  '   > $d/F_ion-electron.dat
 
   grep -h "free  energy ML TOTEN" $ff | awk -v NN=$NN -v dt=$dt  '{printf ("%f  %.8f\n", NR*dt, $(NF-1)/NN) }'    > $d/F.dat # TOTEN= F = U_el - TS_el = Pot + EENTRO   (EENTRO = -TS)
   #grep -h "ion-electron   TOTEN" $ff | awk -v N=$NN '{printf ("%.8f\n", $(NF-2)/N) }'    > $d/F_ion-electron.dat # Same as "free  energy   TOTEN"
  fi
+ #==============================================================#
 
  #echo "Calculating Total Energy ETOTAL (Kin+F)"                            # Not very realistic, since it includes the smearing, which is non physical (ETOTAL = TOTEN + EKIN = F_el + <KIN>)
  #grep -h "ETOTAL" $ff | awk -v N=$NN '{print $5/N}'                       > $d/Etotal.dat   # This is the one that remains constant in NVE (microcanonical); BUT IT IS NOT THE <E> OF THE SYSTEM! (see E.dat). But good for benchmarks
@@ -131,7 +161,15 @@ grep -h "volume of cel" $ff | awk '{print $NF}' > $d/vol.dat #| sed -e '$d' > $d
   echo "    Machine Learning calculation                       ---> Pot.dat (same as TOTEN = F ), Pot_KS.dat (DFT) "
   #grep -h "energy  without entropy" $ff | grep -v "ML energy" | awk -v N=$NN '{printf("%.10f\n",$4/N)}' > $d/Pot_KS.dat   # energy  without entropy = potential energy. 
   grep -h "ML energy  without entropy" $ff | awk -v N=$NN -v dt=$dt '{printf("%10f  %.10f\n", NR*dt,$5/N)}'                 > $d/Pot.dat    # energy  without entropy = potential energy. 
-  awk -v NN=$NN  'FNR==1{fileN++; N+=nstep;} /POTIM = /{dt=$3} /Ionic step/{nstep=$4} /energy  without entropy/ && !/ML/{Pot=$4;  printf ("%s  %.8f\n", (nstep+N-1)*dt, Pot/NN ) } ' $ff   > $d/Pot_KS.dat
+
+  if [ "$(grep "TOTAL-FORCE" OUTCAR  | grep -v ML)" == "" ]; then echo "" > $d/Pot_KS.dat;
+  else
+  ## Old algorithm
+  ##awk -v NN=$NN  'FNR==1{fileN++; N+=nstep;} /POTIM = /{dt=$3} /Ionic step/{nstep=$4} /energy  without entropy/ && !/ML/{Pot=$4;  printf ("%s  %.8f\n", (nstep+N-1)*dt, Pot/NN ) } ' $ff   > $d/Pot_KS.dat
+
+  # New algorithm 04/03/2024
+  grep  -h 'POTIM\|Ionic step\|energy  without entropy'  $ff  | awk  -v NN=$NN ' /POTIM = /{dt=$3; N+=nstep} /Ionic step/{nstep=$4} /energy  without entropy/ && !/ML/{Pot=$4;  printf ("%s  %.8f\n", (nstep+N-1)*dt, Pot/NN ) } ' $ff   > $d/Pot_KS.dat 
+  fi
   #awk -v NN=$NN  'FNR==1{fileN++; N+=nstep;} /POTIM = /{dt=$3} /Ionic step/{nstep=$4} /ML energy  without entropy/{Pot=$5;  printf ("%s  %.8f\n", (nstep+N-1)*dt, Pot/NN ) } ' $ff    > $d/Pot.dat
  fi
 
