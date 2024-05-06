@@ -26,6 +26,7 @@ if [ -z $1 ] ; then
  echo "                                 In machine learning, 'ML energy  without entropy' and Pot.dat = F.dat = TOTEN' [so, it DOES contain entropy... misnomer]"
  echo "  Pot_KS.dat               ---> In machine learning, 'energy  without entropy' (just Kohn-Sham, DFT energies)"
  echo "E.dat                      ---> <E> = 3/2 NkT + 'energy  without entropy' = Actual thermodynamic total energy"
+ echo "  E_KS.dat                 ---> In machine learning, Pot_KS + 3/2 NkT"
  exit
 fi
 
@@ -66,12 +67,12 @@ do
 
  dt=$(grep -h -m 1 'POTIM' $d/OUTCAR| awk '{print $3}')
  NBLOCK=$(awk '/NBLOCK/{print $3}' $d/INCAR)
- dt=`echo $dt $NBLOCK | awk '{print $1*$2}'`
+ #dt=`echo $dt $NBLOCK | awk '{print $1*$2}'`
 
  echo "Calculating EKIN                                      ---> $d/Kin.dat"
  grep -h "EKIN " $ff | awk '{print $5}'                                > $d/Kin.dat 
  # Any version: at high T, Fortran runs out of characters for T, but not for EKIN
- cat $d/Kin.dat      | awk -v N=$N  -v dt=$dt '{EKIN=$1; printf("%f  %.3f\n" ,NR*dt, 11604.506*2*EKIN/(3*N-3))}' > $d/temp.dat #  <K>=3/2 NkT => T = K/(1.5 N k),  eV/kboltzmann =  11604.506 K       
+ cat $d/Kin.dat      | awk -v N=$N  -v dt=$dt '{EKIN=$1; printf("%.1f  %.2f\n" ,NR*dt, 11604.506*2*EKIN/(3*N-3))}' > $d/temp.dat #  <K>=3/2 NkT => T = K/(1.5 N k),  eV/kboltzmann =  11604.506 K       
  grep -h "EKIN " $ff | awk -v N=$NN -v dt=$dt '{print NR*dt,$5/N}'                     > $d/Kin.dat   # <--- E/atom
 
 
@@ -94,7 +95,8 @@ do
  #==========================================================#
 
  echo "Calculating Volume (to calculate NkT/V)"
-grep -h "volume of cel" $ff | awk '{print $NF}' > $d/vol.dat #| sed -e '$d' > $d/vol.dat
+ #grep -h "volume of cel" $ff | awk '{print $NF}' > $d/vol.dat #| sed -e '$d' > $d/vol.dat  # This only works for NVT
+ grep -h 'POTIM\|Ionic step\| direct lattice vectors' $ff -A 3| awk ' /POTIM = /{dt=$3; N+=nstep} /Ionic step/{nstep=$4} /direct/{getline; a1=$1;a2=$2;a3=$3;getline;b1=$1;b2=$2;b3=$3;getline;c1=$1;c2=$2;c3=$3;     V= (a2*b3-a3*b2)*c1 - (a1*b3-a3*b1)*c2 + (a1*b2-a2*b1)*c3; printf("%.1f  %10.4f\n", (nstep+N)*dt,V)}'  > $d/vol.dat # NPT
  #V=$(grep -h volume $ff -m 2|tail -1|awk '{print $(NF-1)}')
  V=`awk 'BEGIN{getline;getline;f=$1;getline;ax=$1;ay=$2;az=$3;getline;bx=$1;by=$2;bz=$3;getline;cx=$1;cy=$2;cz=$3;V=ax*(by*cz-bz*cy)+ay*(bz*cx-bx*cz)+az*(bx*cy-by*cx);V*=f*f*f;printf("%.8f",V)}' $d/POSCAR`
 
@@ -147,6 +149,7 @@ grep -h "volume of cel" $ff | awk '{print $NF}' > $d/vol.dat #| sed -e '$d' > $d
    if [ "${EENTRO}" == "" ]; then EENTRO=`grep EENTRO $d/*/OUTCAR | tail -1 | awk '{print $NF}'`; fi  # Assume there is a directory inside $d with the DFT calculation
    echo "Subtracting EENTRO= $EENTRO to F to get U=F-EENTRO to obtain E= U  + 3/2*N*kB*T ---> E.dat"
    awk -v N=$N -v NN=$NN -v T=$tebeg -v kB=$kB -v EENTRO=$EENTRO '{F=$2; U=(F-EENTRO/NN); print $1, U  + 1.5*N*kB*T/NN ; }'     $d/Pot.dat > $d/E.dat   # Assuming equipartition <K>=3/2 N*kb*T (canonical), and Pot.dat= F.dat = TOTEN
+   awk -v N=$N -v NN=$NN -v T=$tebeg -v kB=$kB '{U=$2; print $1, U + 1.5*N*kB*T/NN   }'     $d/Pot_KS.dat > $d/E_KS.dat   # Assuming equipartition <K>=3/2 N*kb*T (canonical)
   fi
   #awk -v N=$N -v T=$tebeg -v kB=$kB '{print $1/N + 1.5*N*kB*T/N }'     $d/Pot.dat > $d/E.dat   # Assuming equipartition <K>=3/2 N*kb*T (canonical) <--- E/atom
   echo "Correcting Pressure (using thermostat T)...                 press.dat ---> tot_press.dat (Thermostat temperature)"
