@@ -1,29 +1,25 @@
 # VASP-scripts
-Shell scripts to analyze VASP simulations (mostly MD)
+This repository contains a collection of Bash utilities to post-process and analyze VASP simulation outputs.
+The scripts are designed to simplify the extraction of thermodynamic and statistical information from DFT molecular dynamics and static calculations performed with VASP.
 
-```
-Obtain the Temperature, Pressure, and Energies as a function of time from MD simulations [Berkeley 05-21-18]
+## Documentation
 
-It creates the table with average energy, pressure, temperature, density, etc.
+Check my [wiki page](https://github.com/fgonzcat/VASP-scripts/wiki/)
 
-Usage: /home/fgonzalez/scripts/get-TP(t).sh  T-*
-Usage: /home/fgonzalez/scripts/get-TP(t).sh  T-{25,30,53}00
-Usage: /home/fgonzalez/scripts/get-TP(t).sh  Fe206
+## 📂 Available Scripts
 
-SUMMARY OF THE FILES GENERATED
-================================
-Kin.dat                    ---> EKIN
-press.dat                  ---> 'external pressure' (just external, no ideal gas correction)
-totpress.dat               ---> external + ideal gas correction (instant. T)
-  press_KS.dat             ---> In machine learning, 'external pressure' (just Kohn-Sham, DFT pressures)
-  totpress_KS.dat          ---> In machine learning, external + ideal gas correction with instant. T (just Kohn-Sham, DFT pressures)
-F.dat                      ---> TOTEN= F = U_el - TS_el = Pot + EENTRO   [EENTRO = -TS]).
-                                In machine learning, 'free  energy ML TOTEN' and TOTEN=Pot because F= ion-electron TOTEN = ML energy  without entropy = Pot.dat
-  F_KS.dat                 ---> In machine learning, 'free  energy   TOTEN' (just Kohn-Sham, DFT TOTEN)
-F_ion-electron.dat         ---> The 'see above ion-electron   TOTEN'  =  'free  energy   TOTEN') (In ML, contains both KS and ML TOTEN combined)
-Etotal.dat                 ---> ETOTAL= TOTEN+EKIN+ES+EPS (energy Etotal, includes thermostat)]
-Pot.dat                    ---> 'energy  without entropy'
-                                 In machine learning, 'ML energy  without entropy' and Pot.dat = F.dat = TOTEN' [so, it DOES contain entropy... misnomer]
-  Pot_KS.dat               ---> In machine learning, 'energy  without entropy' (just Kohn-Sham, DFT energies)
-E.dat                      ---> <E> = 3/2 NkT + 'energy  without entropy' = Actual thermodynamic total energy
-```
+
+### 🔹 [get-TP.sh](https://github.com/fgonzcat/VASP-scripts/wiki/get-TP)
+Obtain **Temperature, Pressure, and Energies** as a function of time from MD simulations: $T(t)$, $E(t)$, $P(t)$.   
+Generates a suite of `.dat` files with averages of key thermodynamic quantities:
+
+
+
+
+### 🔹 [Convergence Test](https://github.com/fgonzcat/VASP-scripts/wiki/convergence)
+Analyze the convergence behavior of running averages such as free energy (`F_ev.dat`) or pressure (`tot_press_ev.dat`).  
+- Fits the data to an exponential relaxation model  
+- Computes a **Convergence Quality (%)**  
+- Estimates the step at which convergence is achieved  
+
+
