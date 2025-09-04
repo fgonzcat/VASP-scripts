@@ -9,7 +9,7 @@ Check my [wiki page](https://github.com/fgonzcat/VASP-scripts/wiki/)
 ## 📂 Available Scripts
 
 
-### 🔹 [get-TP(t).sh](https://github.com/fgonzcat/VASP-scripts/wiki/get-TP(t).sh)
+### 🔹 [get-TP(t).sh](https://github.com/fgonzcat/VASP-scripts/wiki/get-TP)
 Obtain **Temperature, Pressure, and Energies** as a function of time from MD simulations: $T(t)$, $E(t)$, $P(t)$.   
 Generates a suite of `.dat` files with averages of key thermodynamic quantities:
 
